@@ -1,0 +1,615 @@
+---
+title: "clean data"
+output: pdf_document
+---
+```{r}
+suppressMessages(library(dplyr))
+suppressMessages(library(ggplot2))
+suppressMessages(library(tidyverse))
+suppressMessages(library(gridExtra))
+```
+
+
+```{r}
+wine <- read.csv("~/path/to/wine.csv")
+rain <- read.table("~/path/to/rain.txt", header=TRUE, skip=1)
+temp <- read.table("~/path/to/temp.txt", header=TRUE)
+yield <- read_csv("~/path/to/ca_wine_prod.csv")
+```
+
+
+
+```{r}
+wine[wine == ""] <- NA
+
+head(wine)
+
+sum(!complete.cases(wine))
+```
+
+
+
+```{r}
+wine_clean <- wine %>%
+  select(-designation, -reviewer)
+```
+
+
+```{r}
+wine_clean_location <- wine_clean %>%
+  separate(
+    appellation,
+    into = c("region_1", "discard"),
+    sep = ",",
+    remove = FALSE,
+    extra = "drop",
+    fill = "right"
+  ) %>%
+  select(-discard) %>%
+  mutate(region_1 = trimws(region_1))
+```
+
+
+```{r}
+wine_clean_location %>%
+  count(region_1, sort = TRUE) %>%
+  filter(n > 1)
+```
+
+
+```{r}
+rain <- rain %>%
+  filter(row_number() <= n() - 1)
+
+ggplot(data=rain, aes(x=rain$Year, y=( (rain$Jan. + rain$Feb. + rain$Mar. + rain$Apr. + rain$May + rain$Jun. + rain$Jul. + rain$Aug.+ rain$Sep. + rain$Oct. + rain$Nov. + rain$Dec.) / 12 ))) +
+  geom_col() +
+  xlab("Year") +
+  ylab("Precipitation in 1/100th inches")
+
+
+rain
+glimpse(rain)
+```
+
+
+```{r}
+
+yield_napa <- yield %>%
+  filter(County == "Napa")
+yield_napa
+glimpse(yield_napa)
+```
+
+```{r}
+rain <- rain %>%
+  mutate(
+    mean_monthly = (
+      Jan. + Feb. + Mar. + Apr. + May + Jun. + Jul. + Aug. + Sep. + Oct. + Nov. + Dec.
+    ) / 12 / 100
+  ) %>%
+  mutate(
+    mean_harvest = (
+      Aug. + Sep. + Oct. + Nov.
+    ) / 4 / 100
+  ) %>%
+  mutate (
+    oct = ( Oct. ) / 100
+  )
+
+length(rain$mean_monthly)
+length(rain$mean_harvest)
+rain$Oct.
+```
+
+```{r}
+rain_and_yield <- yield_napa %>%
+  inner_join(rain, by = "Year")
+
+rain_and_yield
+```
+
+```{r}
+napa_rain_year <- ggplot(rain_and_yield, aes(x=mean_monthly, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Napa grape yield vs average precipitation",
+    subtitle = "January - December",
+    x = "Average yearly precipitation (inches)",
+    y = "Yield (Tons per acre)"
+  ) 
+```
+
+
+```{r}
+napa_rain_harvest <- ggplot(rain_and_yield, aes(x=mean_harvest, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Napa grape yield vs average precipitation",
+    subtitle = "(August - November)",
+    x = "Average harvest precipitation (inches)",
+    y = "Yield (Tons per acre)"
+  )
+```
+
+```{r}
+napa_rain_october <- ggplot(rain_and_yield, aes(x=oct, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Napa grape yield vs precipitation",
+    #subtitle = "(October)",
+    x = "Precipitation in October (inches)",
+    y = "Yield (Tons per acre)"
+  )
+```
+
+
+```{r}
+temp <- temp %>%
+  mutate(
+    mean_monthly = (
+      Jan. + Feb. + Mar. + Apr. + May + Jun. + Jul. + Aug. + Sep. + Oct. + Nov. + Dec.
+    ) / 12 / 10
+  ) %>%
+  mutate(
+    mean_harvest = (
+      Aug. + Sep. + Oct. + Nov.
+    ) / 4 / 10
+  ) %>%
+  mutate (
+    oct = ( Oct. ) / 10
+  )
+
+length(temp$mean_monthly)
+length(temp$mean_harvest)
+temp$Oct.
+```
+
+
+```{r}
+temp_and_yield <- yield_napa %>%
+  inner_join(temp, by = "Year")
+
+temp_and_yield
+```
+
+
+```{r}
+napa_temp_year <- ggplot(temp_and_yield, aes(x=mean_monthly, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Napa grape yield vs average temperature",
+    subtitle = "January - December",
+    x = "Average yearly temperature (F)",
+    y = "Yield (Tons per acre)"
+  ) 
+```
+
+```{r}
+napa_temp_harvest <- ggplot(temp_and_yield, aes(x=mean_harvest, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Napa grape yield vs harvest temperature",
+    subtitle = "(August - November)",
+    x = "Average harvest temperature (F)",
+    y = "Yield (Tons per acre)"
+  )
+```
+
+
+```{r}
+napa_temp_october <- ggplot(temp_and_yield, aes(x=oct, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Napa grape yield vs temperature",
+    #subtitle = "(October)",
+    x = "Temperature in October (F)",
+    y = "Yield (Tons per acre)"
+  )
+```
+
+
+
+```{r, fig.width=15, fig.height=3}
+grid.arrange(napa_rain_year, napa_rain_harvest, napa_rain_october, ncol=3)
+grid.arrange(napa_temp_year, napa_temp_harvest, napa_temp_october, ncol=3)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+yield_sonoma <- yield %>%
+  filter(County == "Sonoma")
+yield_sonoma
+glimpse(yield_sonoma)
+yield_sonoma
+```
+
+
+```{r}
+rain_and_yield <- yield_sonoma %>%
+  inner_join(rain, by = "Year")
+
+rain_and_yield
+```
+
+```{r}
+napa_rain_year <- ggplot(rain_and_yield, aes(x=mean_monthly, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Sonoma grape yield vs average precipitation",
+    subtitle = "January - December",
+    x = "Average yearly precipitation (inches)",
+    y = "Yield (Tons per acre)"
+  ) 
+```
+
+
+```{r}
+napa_rain_harvest <- ggplot(rain_and_yield, aes(x=mean_harvest, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Sonoma grape yield vs average precipitation",
+    subtitle = "(August - November)",
+    x = "Average harvest precipitation (inches)",
+    y = "Yield (Tons per acre)"
+  )
+```
+
+```{r}
+napa_rain_october <- ggplot(rain_and_yield, aes(x=oct, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Sonoma grape yield vs precipitation",
+    #subtitle = "(October)",
+    x = "Precipitation in October (inches)",
+    y = "Yield (Tons per acre)"
+  )
+```
+
+
+```{r}
+temp_and_yield <- yield_sonoma %>%
+  inner_join(temp, by = "Year")
+
+temp_and_yield
+```
+
+
+```{r}
+napa_temp_year <- ggplot(temp_and_yield, aes(x=mean_monthly, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Sonoma grape yield vs average temperature",
+    subtitle = "January - December",
+    x = "Average yearly temperature (F)",
+    y = "Yield (Tons per acre)"
+  ) 
+```
+
+```{r}
+napa_temp_harvest <- ggplot(temp_and_yield, aes(x=mean_harvest, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Sonoma grape yield vs harvest temperature",
+    subtitle = "(August - November)",
+    x = "Average harvest temperature (F)",
+    y = "Yield (Tons per acre)"
+  )
+```
+
+
+```{r}
+napa_temp_october <- ggplot(temp_and_yield, aes(x=oct, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Sonoma grape yield vs temperature",
+    #subtitle = "(October)",
+    x = "Temperature in October (F)",
+    y = "Yield (Tons per acre)"
+  )
+```
+
+
+
+```{r, fig.width=15, fig.height=3}
+grid.arrange(napa_rain_year, napa_rain_harvest, napa_rain_october, ncol=3)
+grid.arrange(napa_temp_year, napa_temp_harvest, napa_temp_october, ncol=3)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+yield_sonoma <- yield %>%
+  filter(
+      County == "SanFrancisco" |
+      County == "Alameda" |
+      County == "ContraCosta" |
+      County == "SanMateo" |
+      County == "SantaClara" |
+      County == "SantaCruz" |
+      County == "Monterey" |
+      County == "SanBenito" |
+      County == "SanLuisObispo" |
+      County == "SantaBarbara"
+      )
+yield_sonoma
+glimpse(yield_sonoma)
+yield_sonoma
+```
+
+
+```{r}
+rain_and_yield <- yield_sonoma %>%
+  inner_join(rain, by = "Year")
+
+rain_and_yield
+```
+
+```{r}
+napa_rain_year <- ggplot(rain_and_yield, aes(x=mean_monthly, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Central Coast grape yield vs average precipitation",
+    subtitle = "January - December",
+    x = "Average yearly precipitation (inches)",
+    y = "Yield (Tons per acre)"
+  ) 
+```
+
+
+```{r}
+napa_rain_harvest <- ggplot(rain_and_yield, aes(x=mean_harvest, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Central Coast grape yield vs average precipitation",
+    subtitle = "(August - November)",
+    x = "Average harvest precipitation (inches)",
+    y = "Yield (Tons per acre)"
+  )
+```
+
+```{r}
+napa_rain_october <- ggplot(rain_and_yield, aes(x=oct, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Central Coast grape yield vs precipitation",
+    #subtitle = "(October)",
+    x = "Precipitation in October (inches)",
+    y = "Yield (Tons per acre)"
+  )
+```
+
+
+```{r}
+temp_and_yield <- yield_sonoma %>%
+  inner_join(temp, by = "Year")
+
+temp_and_yield
+```
+
+
+```{r}
+napa_temp_year <- ggplot(temp_and_yield, aes(x=mean_monthly, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Central Coast grape yield vs average temperature",
+    subtitle = "January - December",
+    x = "Average yearly temperature (F)",
+    y = "Yield (Tons per acre)"
+  ) 
+```
+
+```{r}
+napa_temp_harvest <- ggplot(temp_and_yield, aes(x=mean_harvest, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Central Coast grape yield vs harvest temperature",
+    subtitle = "(August - November)",
+    x = "Average harvest temperature (F)",
+    y = "Yield (Tons per acre)"
+  )
+```
+
+
+```{r}
+napa_temp_october <- ggplot(temp_and_yield, aes(x=oct, y = `Yield(Unit/Acre)`)) +
+  geom_point(size = 3, color = "grey") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Central Coast grape yield vs temperature",
+    #subtitle = "(October)",
+    x = "Temperature in October (F)",
+    y = "Yield (Tons per acre)"
+  )
+```
+
+
+
+```{r, fig.width=12, fig.height=12}
+grid.arrange(napa_rain_year, napa_rain_harvest, napa_rain_october, ncol=1)
+grid.arrange(napa_temp_year, napa_temp_harvest, napa_temp_october, ncol=1)
+```
